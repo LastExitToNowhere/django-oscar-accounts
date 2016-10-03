@@ -2,6 +2,7 @@ import datetime
 from decimal import Decimal as D
 
 from django import http
+from django.conf import settings
 from django.contrib import messages
 from django.core.urlresolvers import reverse
 from django.db.models import Sum
@@ -21,12 +22,16 @@ Transfer = get_model('oscar_accounts', 'Transfer')
 Transaction = get_model('oscar_accounts', 'Transaction')
 
 
+DASHBOARD_ITEMS_PER_PAGE = getattr(settings,
+                                   'OSCAR_DASHBOARD_ITEMS_PER_PAGE', 20)
+
 class AccountListView(generic.ListView):
     model = Account
     context_object_name = 'accounts'
     template_name = 'accounts/dashboard/account_list.html'
     form_class = forms.SearchForm
     description = _("All %s") % names.UNIT_NAME_PLURAL.lower()
+    paginate_by = DASHBOARD_ITEMS_PER_PAGE
 
     def get_context_data(self, **kwargs):
         ctx = super(AccountListView, self).get_context_data(**kwargs)
@@ -39,14 +44,8 @@ class AccountListView(generic.ListView):
     def get_queryset(self):
         queryset = Account.objects.all()
 
-        if 'code' not in self.request.GET:
-            # Form not submitted
-            self.form = self.form_class()
-            return queryset
-
         self.form = self.form_class(self.request.GET)
         if not self.form.is_valid():
-            # Form submitted but invalid
             return queryset
 
         # Form valid - build queryset and description
@@ -59,15 +58,17 @@ class AccountListView(generic.ListView):
             'code_filter': "",
             'name_filter': "",
         }
-        if data['name']:
+        if data.get('name'):
             queryset = queryset.filter(name__icontains=data['name'])
             desc_ctx['name_filter'] = _(
                 " with name matching '%s'") % data['name']
-        if data['code']:
-            queryset = queryset.filter(code=data['code'])
+        if data.get('code'):
+            code = data['code']
+            code = code.upper()
+            queryset = queryset.filter(code=code)
             desc_ctx['code_filter'] = _(
                 " with code '%s'") % data['code']
-        if data['status']:
+        if data.get('status'):
             queryset = queryset.filter(status=data['status'])
             desc_ctx['status'] = data['status']
 
@@ -218,6 +219,7 @@ class TransferListView(generic.ListView):
     template_name = 'accounts/dashboard/transfer_list.html'
     form_class = forms.TransferSearchForm
     description = _("All transfers")
+    paginate_by = DASHBOARD_ITEMS_PER_PAGE
 
     def get_context_data(self, **kwargs):
         ctx = super(TransferListView, self).get_context_data(**kwargs)
