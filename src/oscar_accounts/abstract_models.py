@@ -146,7 +146,9 @@ class Account(models.Model):
         if self.code:
             self.code = self.code.upper()
         # Ensure the balance is always correct when saving
-        self.balance = self._balance()
+        # Django 4.2 requires a pk to use manager methods as in self._balance()
+        if self.pk is not None:
+            self.balance = self._balance()
         return super().save(*args, **kwargs)
 
     def _balance(self):
